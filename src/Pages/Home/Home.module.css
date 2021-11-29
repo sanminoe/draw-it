@@ -1,0 +1,15 @@
+.Wrapper {
+  background-color: aqua;
+  position: relative;
+  height: calc(100vh - 20px);
+}
+.RoomsWrapper {
+  width: 90%;
+  height: 90%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  background-color: red;
+}

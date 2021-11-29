@@ -1,0 +1,7 @@
+.Room {
+  background-color: seagreen;
+  width: 14rem;
+  height: 6rem;
+  display: flex;
+  flex-direction: column;
+}

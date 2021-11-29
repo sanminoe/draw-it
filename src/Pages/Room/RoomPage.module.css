@@ -1,0 +1,8 @@
+.Wrapper {
+  background-color: sienna;
+  position: relative;
+}
+.ToolsWrapper {
+  position: absolute;
+  user-select: none;
+}
