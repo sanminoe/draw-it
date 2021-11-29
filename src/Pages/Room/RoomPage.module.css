@@ -1,8 +1,28 @@
 .Wrapper {
-  background-color: sienna;
+  position: relative;
+  display: flex;
+}
+.canvas {
+  z-index: 39;
+}
+.ToolsButtons {
+  display: flex;
+  user-select: none;
+
+  flex-direction: column;
+}
+.ToolsButtons > button {
+  z-index: 40;
+}
+.ToolsOptions {
+  margin-left: 5rem;
+}
+.Canvases {
   position: relative;
 }
-.ToolsWrapper {
+#overlay {
+  z-index: 30;
   position: absolute;
-  user-select: none;
+  top: 0;
+  left: 0;
 }
