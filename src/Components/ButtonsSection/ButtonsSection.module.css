@@ -1,0 +1,22 @@
+.Buttons {
+  display: flex;
+  user-select: none;
+
+  flex-direction: column;
+  background-color: var(--bg-section);
+  margin-top: 2rem;
+  margin-left: 1rem;
+  border-radius: 3px;
+  /* border: 1px solid black; */
+}
+.ColorPickerWrapper {
+  width: 100%;
+  display: flex;
+  place-content: center;
+}
+.ColorPickerWrapper input {
+  width: 90%;
+  background-color: var(--bg-section);
+  height: 2.5rem;
+  border: none;
+}

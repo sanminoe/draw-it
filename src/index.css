@@ -1,5 +1,16 @@
+:root {
+  --bg: #2b2d42;
+  --bg-section: #8d99ae;
+  --bg-button: #191a22;
+  --bg-buttonlight: #37373c;
+}
+
 * {
   padding: 0;
   margin: 0;
   box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg);
 }

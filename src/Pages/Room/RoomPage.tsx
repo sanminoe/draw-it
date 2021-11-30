@@ -1,6 +1,8 @@
 import { SyntheticEvent, useEffect, useRef, useState } from "react";
 import drawOval from "../../../helpers/drawOval";
 import hexToRgb from "../../../helpers/hexToRgb";
+import { rgbToHex } from "../../../helpers/rgbToHex";
+import ButtonsSection from "../../Components/ButtonsSection/ButtonsSection";
 import style from "./RoomPage.module.css";
 
 type Point = {
@@ -9,6 +11,8 @@ type Point = {
   width?: number;
   height?: number;
   color?: string;
+  size?: number;
+  filled?: boolean;
 };
 interface DrawingData {
   tool: string;
@@ -20,70 +24,11 @@ function RoomPage() {
   let [data, setData] = useState<DrawingData[]>([]);
   const [toolColor, setToolColor] = useState("#000000");
   let [isFilled, setIsFilled] = useState(false);
-  const [toolOpacity, setToolOpacity] = useState(1);
 
   let isDrawing = useRef<Boolean>(false);
 
   let overlayRef = useRef<HTMLCanvasElement>(null);
   let canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const handlerOnMouseDown = (
-    e: SyntheticEvent<HTMLCanvasElement, MouseEvent>
-  ): void => {
-    isDrawing.current = true;
-    const mousePos = getMousePosition(e);
-    const ctx = canvasRef.current?.getContext("2d");
-    if (tool === "pen") {
-      ctx?.beginPath();
-      ctx!.lineCap = "round";
-      ctx!.lineJoin = "round";
-      ctx!.lineWidth = toolSize;
-      ctx?.moveTo(mousePos.x, mousePos.y);
-    } else if (tool === "eraser") {
-      ctx?.beginPath();
-      ctx!.lineCap = "round";
-      ctx!.lineJoin = "round";
-      ctx!.lineWidth = toolSize;
-      ctx?.moveTo(mousePos.x, mousePos.y);
-    }
-    setData([...data, { tool, points: [{ x: mousePos.x, y: mousePos.y }] }]);
-  };
-
-  const handlerOnMove = (
-    e: SyntheticEvent<HTMLCanvasElement, MouseEvent>
-  ): void => {
-    if (!isDrawing.current) return;
-    const ctx = canvasRef.current!.getContext("2d");
-    const mousePos = getMousePosition(e);
-
-    if (tool === "pen") {
-      // data.map((d) => {
-      //   render(ctx!, d);
-      // });
-      let color = `rgba(${hexToRgb(toolColor)},${toolOpacity})`;
-      ctx!.strokeStyle = color;
-      ctx?.lineTo(mousePos.x, mousePos.y);
-      ctx!.globalCompositeOperation = "source-over";
-      ctx!.stroke();
-    } else if (tool === "eraser") {
-      ctx?.lineTo(mousePos.x, mousePos.y);
-      ctx?.stroke();
-    }
-
-    let lastLine = data[data.length - 1];
-
-    lastLine.points = lastLine.points.concat([
-      { x: mousePos.x, y: mousePos.y },
-    ]);
-    setData(data.concat());
-  };
-
-  const handlerMouseUp = (e: SyntheticEvent<HTMLCanvasElement, MouseEvent>) => {
-    const ctx = canvasRef.current!.getContext("2d");
-    ctx?.stroke();
-
-    isDrawing.current = false;
-  };
 
   const getMousePosition = (
     e: SyntheticEvent<HTMLCanvasElement, MouseEvent>
@@ -98,13 +43,26 @@ function RoomPage() {
     };
   };
 
-  const render = (ctx: CanvasRenderingContext2D, obj: DrawingData) => {
-    // Render incoming data
+  const renderToolPreview = (
+    ctx: CanvasRenderingContext2D,
+    mousePosition: Point
+  ) => {
+    ctx?.beginPath();
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1;
+    ctx?.arc(mousePosition.x, mousePosition.y, toolSize / 2, 0, 2 * Math.PI);
+    ctx?.stroke();
+    ctx?.closePath();
+  };
+
+  const penToolRender = (ctx: CanvasRenderingContext2D, obj: DrawingData) => {
+    // Render incoming pen data
     let points = obj.points;
     if (points.length < 6) {
       let p = points[0];
       ctx.beginPath();
-      ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2, false);
+      ctx.fillStyle = p.color as string;
+      ctx.arc(p.x, p.y, p.size! / 2, 0, Math.PI * 2, false);
       ctx.closePath();
       ctx.fill();
       return;
@@ -112,7 +70,7 @@ function RoomPage() {
     ctx.beginPath();
     ctx!.lineCap = "round";
     ctx!.lineJoin = "round";
-    ctx!.lineWidth = 30;
+    ctx!.lineWidth = points[0].size as number;
 
     ctx.moveTo(points[0].x, points[0].y);
 
@@ -122,16 +80,83 @@ function RoomPage() {
       const c1 = (points[i].x + points[i + 1].x) / 2;
       const c2 = (points[i].y + points[i + 1].y) / 2;
 
+      ctx!.strokeStyle = points[i].color as string;
       ctx.quadraticCurveTo(points[i].x, points[i].y, c1, c2);
     }
-    ctx.stroke();
   };
 
-  useEffect(() => {
-    let ctx = canvasRef.current?.getContext("2d");
-    ctx!.globalCompositeOperation =
-      tool === "eraser" ? "destination-out" : "source-over";
-  }, [tool]);
+  const rectToolRender = (
+    ctx: CanvasRenderingContext2D,
+    shape: DrawingData
+  ) => {
+    let firstPoint = shape.points[0];
+    let lastPoint = shape.points[shape.points.length - 1];
+    let width = lastPoint.x - firstPoint.x;
+    let height = lastPoint.y - firstPoint.y;
+    ctx!.lineJoin = "miter";
+    ctx?.beginPath();
+    if (firstPoint.filled) {
+      ctx!.fillStyle = firstPoint.color as string;
+      ctx?.fillRect(firstPoint.x, firstPoint.y, width, height);
+    } else {
+      ctx!.lineWidth = firstPoint.size as number;
+      ctx!.strokeStyle = firstPoint.color as string;
+      ctx?.rect(firstPoint.x, firstPoint.y, width, height);
+
+      ctx?.stroke();
+    }
+    ctx?.closePath();
+  };
+  const ellipseToolRender = (
+    ctx: CanvasRenderingContext2D,
+    shape: DrawingData
+  ) => {
+    const firstPoint = shape.points[0];
+    const lastPoint = shape.points[shape.points.length - 1];
+
+    drawOval(ctx!, firstPoint.x, firstPoint.y, lastPoint.x, lastPoint.y);
+    if (!firstPoint.filled) {
+      ctx.lineWidth = firstPoint.height as number;
+      ctx.strokeStyle = firstPoint.color as string;
+      ctx?.stroke();
+    } else {
+      ctx.fillStyle = firstPoint.color as string;
+      ctx?.fill();
+    }
+  };
+
+  const lineToolRender = (
+    ctx: CanvasRenderingContext2D,
+    shape: DrawingData
+  ) => {
+    const firstPoint = shape.points[0],
+      lastPoint = shape.points[shape.points.length - 1];
+    ctx?.beginPath();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = firstPoint.size as number;
+    ctx.strokeStyle = firstPoint.color as string;
+    ctx.moveTo(firstPoint.x, firstPoint.y);
+    ctx.lineTo(lastPoint.x, lastPoint.y);
+    ctx.stroke();
+  };
+  interface MouseCords {
+    x: number;
+    y: number;
+  }
+  const colorPickerTool = (
+    ctx: CanvasRenderingContext2D,
+    mousePosition: MouseCords
+  ): string => {
+    const imageData = ctx.getImageData(
+      mousePosition.x,
+      mousePosition.y,
+      1,
+      1
+    ).data;
+
+    return rgbToHex(imageData[0], imageData[1], imageData[2]);
+  };
 
   const clearCanvas = () => {
     const ctx = canvasRef.current?.getContext("2d");
@@ -143,77 +168,84 @@ function RoomPage() {
     e: SyntheticEvent<HTMLCanvasElement, MouseEvent>
   ) => {
     let mousePos = getMousePosition(e);
-    isDrawing.current = true;
+    if (tool === "picker") {
+      let color = colorPickerTool(
+        canvasRef.current?.getContext("2d") as CanvasRenderingContext2D,
+        mousePos
+      );
+      console.log(color);
+      setTool("pen");
+      setToolColor(color);
+    } else {
+      isDrawing.current = true;
 
-    setData([...data, { tool, points: [{ x: mousePos.x, y: mousePos.y }] }]);
+      setData([
+        ...data,
+        {
+          tool,
+          points: [
+            {
+              x: mousePos.x,
+              y: mousePos.y,
+              color: toolColor,
+              size: toolSize,
+              filled: isFilled,
+            },
+          ],
+        },
+      ]);
+    }
   };
 
   const handlerOverlayMouseMove = (
     e: SyntheticEvent<HTMLCanvasElement, MouseEvent>
   ) => {
-    if (!isDrawing.current) {
-      return;
-    }
     let ctx = overlayRef.current?.getContext("2d");
+    let orCtx = canvasRef.current?.getContext("2d");
     ctx?.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     let mousePos = getMousePosition(e);
-    let lastLine = data[data.length - 1];
-    if (tool === "rectangle") {
-      let width = mousePos.x - lastLine.points[0].x;
-      let height = mousePos.y - lastLine.points[0].y;
-
-      ctx?.beginPath();
-      if (isFilled) {
-        ctx?.fillRect(
-          lastLine.points[0].x,
-          lastLine.points[0].y,
-          width,
-          height
-        );
-      } else {
-        ctx?.rect(lastLine.points[0].x, lastLine.points[0].y, width, height);
-        ctx!.lineWidth = toolSize;
-        ctx?.stroke();
-      }
-      ctx?.closePath();
-
-      lastLine.points = lastLine.points.concat([
-        { x: mousePos.x, y: mousePos.y, width, height },
-      ]);
-    } else if (tool === "ellipse") {
-      drawOval(
-        ctx!,
-        lastLine.points[0].x,
-        lastLine.points[0].y,
-        mousePos.x,
-        mousePos.y
-      );
-
-      if (!isFilled) {
-        ctx!.lineWidth = toolSize;
-        ctx?.stroke();
-      } else {
-        ctx?.fill();
-      }
-
-      lastLine.points = lastLine.points.concat([
-        { x: mousePos.x, y: mousePos.y },
-      ]);
-    } else if (tool === "line") {
-      ctx?.beginPath();
-      ctx!.lineCap = "round";
-      ctx!.lineJoin = "round";
-      ctx!.lineWidth = toolSize;
-      ctx?.moveTo(lastLine.points[0].x, lastLine.points[0].y);
-      ctx?.lineTo(mousePos.x, mousePos.y);
-      ctx?.stroke();
-      lastLine.points = lastLine.points.concat([
-        { x: mousePos.x, y: mousePos.y },
-      ]);
+    // Tool preview
+    renderToolPreview(ctx!, mousePos);
+    if (!isDrawing.current && tool !== "picker") {
+      return;
     }
 
-    setData(data.concat());
+    let lastLine = data[data.length - 1];
+    if (tool !== "picker") {
+      lastLine.points = lastLine.points.concat([
+        {
+          x: mousePos.x,
+          y: mousePos.y,
+          color: toolColor,
+          size: toolSize,
+          filled: isFilled,
+        },
+      ]);
+    }
+    if (tool === "pen") {
+      penToolRender(ctx!, lastLine);
+
+      ctx?.stroke();
+      penToolRender(orCtx!, lastLine);
+    } else if (tool === "eraser") {
+      penToolRender(ctx!, lastLine);
+      ctx!.strokeStyle = "white";
+      ctx?.stroke();
+
+      penToolRender(orCtx!, lastLine);
+    } else if (tool === "rectangle") {
+      rectToolRender(ctx!, lastLine);
+    } else if (tool === "ellipse") {
+      ellipseToolRender(ctx!, lastLine);
+    } else if (tool === "line") {
+      lineToolRender(ctx!, lastLine);
+    }
+    renderToolPreview(ctx!, mousePos);
+    if (tool !== "picker") {
+      setData(data.concat());
+    }
   };
+
   const handlerOverlayMouseUp = (
     e: SyntheticEvent<HTMLCanvasElement, MouseEvent>
   ) => {
@@ -221,62 +253,40 @@ function RoomPage() {
     isDrawing.current = false;
     let overCtx = overlayRef.current?.getContext("2d");
     overCtx?.clearRect(0, 0, overCtx.canvas.width, overCtx.canvas.height);
+
     let ctx = canvasRef.current?.getContext("2d");
     let lastShape = data[data.length - 1];
-    let firstPoint = lastShape.points[0];
-    let lastPoint = lastShape.points[lastShape.points.length - 1];
 
-    if (tool === "rectangle") {
-      ctx?.beginPath();
-      ctx!.lineJoin = "miter";
-      ctx!.lineCap = "butt";
-      if (isFilled) {
-        ctx!.fillRect(
-          firstPoint.x,
-          firstPoint.y,
-          lastPoint.width!,
-          lastPoint.height!
-        );
-      } else {
-        ctx!.lineWidth = toolSize;
-        ctx!.rect(
-          firstPoint.x,
-          firstPoint.y,
-          lastPoint.width!,
-          lastPoint.height!
-        );
-        ctx!.stroke();
-      }
-      ctx!.closePath();
-    } else if (tool === "ellipse") {
-      drawOval(ctx!, firstPoint.x, firstPoint.y, lastPoint.x, lastPoint.y);
-      if (!isFilled) {
-        ctx!.lineWidth = toolSize;
-        ctx?.stroke();
-      } else {
-        ctx?.fill();
-      }
-    } else if (tool === "line") {
-      ctx?.beginPath();
-      ctx!.lineWidth = toolSize;
-      ctx!.lineJoin = "round";
-      ctx!.lineCap = "round";
-      ctx?.moveTo(firstPoint.x, firstPoint.y);
-      ctx?.lineTo(lastPoint.x, lastPoint.y);
+    renderToolPreview(overCtx!, getMousePosition(e));
+
+    if (tool === "pen") {
       ctx?.stroke();
+    } else if (tool === "eraser") {
+      ctx?.stroke();
+    } else if (tool === "rectangle") {
+      rectToolRender(ctx!, lastShape);
+    } else if (tool === "ellipse") {
+      ellipseToolRender(ctx!, lastShape);
+    } else if (tool === "line") {
+      lineToolRender(ctx!, lastShape);
     }
   };
 
+  useEffect(() => {
+    let ctx = canvasRef.current?.getContext("2d");
+    ctx!.globalCompositeOperation =
+      tool === "eraser" ? "destination-out" : "source-over";
+  }, [tool]);
   return (
     <div className={style.Wrapper}>
-      <div className={style.ToolsButtons}>
-        <button onClick={() => setTool("pen")}>Pen</button>
-        <button onClick={() => setTool("eraser")}>Eraser</button>
-        <button onClick={() => setTool("rectangle")}>rectangle</button>
-        <button onClick={() => setTool("ellipse")}>Elipse</button>
-        <button onClick={() => setTool("line")}>Line</button>
-        <button onClick={() => clearCanvas()}>Clear</button>
-      </div>
+      <ButtonsSection
+        onClick={(v: string) => setTool(v)}
+        tool={tool}
+        onClearCanvas={clearCanvas}
+        onSetColor={setToolColor}
+        color={toolColor}
+      />
+
       <div>
         <div className={style.ToolsOptions}>
           <label>
@@ -284,53 +294,42 @@ function RoomPage() {
             <input
               type="range"
               min="1"
-              max="50"
+              max="100"
               value={toolSize}
               onChange={(e) => setToolSize(+e.currentTarget.value)}
             />
           </label>
+
           <label>
-            <span>Opacity</span>
+            <span>Fill</span>
             <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={toolOpacity}
-              onChange={(e) => setToolOpacity(+e.target.value)}
-            />
-          </label>
-          <label>
-            <span>Color</span>
-            <input
-              type="color"
+              type="checkbox"
               name="color"
               id="color"
-              value={toolColor}
-              onChange={(e) => setToolColor(e.target.value)}
+              value={String(isFilled)}
+              onClick={() => setIsFilled(!isFilled)}
             />
           </label>
         </div>
         <div className={style.Canvases}>
-          {tool !== "pen" && tool !== "eraser" && (
-            <canvas
-              ref={overlayRef}
-              id={style.overlay}
-              width={700}
-              height={500}
-              onMouseMove={handlerOverlayMouseMove}
-              onMouseDown={handlerOverlayMouseDown}
-              onMouseUp={handlerOverlayMouseUp}
-            />
-          )}
+          <canvas
+            ref={overlayRef}
+            id={style.overlay}
+            width={700}
+            height={500}
+            onMouseMove={handlerOverlayMouseMove}
+            onMouseDown={handlerOverlayMouseDown}
+            onMouseUp={handlerOverlayMouseUp}
+          />
+
           <canvas
             className={style.canvas}
             ref={canvasRef}
             width={700}
             height={500}
-            onMouseMove={handlerOnMove}
-            onMouseDown={handlerOnMouseDown}
-            onMouseUp={handlerMouseUp}
+            // onMouseMove={handlerOnMove}
+            // onMouseDown={handlerOnMouseDown}
+            // onMouseUp={handlerMouseUp}
           />
         </div>
       </div>
