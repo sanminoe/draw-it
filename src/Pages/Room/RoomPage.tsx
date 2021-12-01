@@ -69,24 +69,23 @@ function RoomPage() {
   const penToolRender = (ctx: CanvasRenderingContext2D, obj: DrawingData) => {
     // Render incoming pen data
     let points = obj.points;
-    // if (points.length < 6) {
-    //   let p = points[0];
-    //   ctx.beginPath();
-    //   ctx.fillStyle = p.color as string;
-    //   ctx.arc(p.x, p.y, p.size! / 2, 0, Math.PI * 2, false);
-    //   ctx.closePath();
-    //   ctx.fill();
-    //   return;
-    // }
+    if (points.length < 6) {
+      let p = points[0];
+      ctx.beginPath();
+      ctx.fillStyle = p.color as string;
+      ctx.arc(p.x, p.y, Math.floor(ctx.lineWidth / 2), 0, Math.PI * 2, false);
+      ctx.fill();
+      ctx.closePath();
+      return;
+    }
+
     ctx.beginPath();
     ctx!.lineCap = "round";
     ctx!.lineJoin = "round";
     ctx!.lineWidth = points[0].size as number;
-    console.log(points);
     ctx.moveTo(points[0].x, points[0].y);
 
     let i = 1;
-
     for (i = 1; i < points.length - 2; i++) {
       const c1 = (points[i].x + points[i + 1].x) / 2;
       const c2 = (points[i].y + points[i + 1].y) / 2;
@@ -211,16 +210,14 @@ function RoomPage() {
           },
         ],
       };
-      if (tool === "pen") {
-        console.log(ctx, shape);
+
+      if (shape.tool === "pen") {
         penToolRender(ctx!, shape);
 
         penToolRender(orCtx!, shape);
-        ctx?.stroke();
       } else if (tool === "eraser") {
         penToolRender(ctx!, shape);
         ctx!.strokeStyle = "white";
-        ctx?.stroke();
 
         penToolRender(orCtx!, shape);
       } else if (tool === "rectangle") {
@@ -261,8 +258,8 @@ function RoomPage() {
     ]);
     if (tool === "pen") {
       penToolRender(ctx!, lastShape);
-
       penToolRender(orCtx!, lastShape);
+
       ctx?.stroke();
     } else if (tool === "eraser") {
       penToolRender(ctx!, lastShape);
@@ -322,15 +319,22 @@ function RoomPage() {
     renderToolPreview(overCtx!, getMousePosition(e));
 
     if (tool === "pen") {
-      ctx?.stroke();
+      penToolRender(ctx!, lastShape);
+      if (lastShape.points.length > 5) {
+        ctx?.stroke();
+      }
     } else if (tool === "eraser") {
-      ctx?.stroke();
+      if (lastShape.points.length > 5) {
+        ctx?.stroke();
+      }
     } else if (tool === "rectangle") {
       rectToolRender(ctx!, lastShape);
     } else if (tool === "ellipse") {
       ellipseToolRender(ctx!, lastShape);
     } else if (tool === "line") {
       lineToolRender(ctx!, lastShape);
+    } else {
+      return;
     }
   };
   const handlerOverlayMouseLeave = (
@@ -359,7 +363,9 @@ function RoomPage() {
     let ctx = canvasRef.current?.getContext("2d");
 
     if (tool === "pen") {
-      ctx?.stroke();
+      if (lastShape.points.length > 5) {
+        ctx?.stroke();
+      }
     } else if (tool === "eraser") {
       ctx?.stroke();
     } else if (tool === "rectangle") {
