@@ -12,11 +12,11 @@
   padding: 0.3rem 0.3rem;
   cursor: pointer;
   border-radius: 2px;
+  border: 2px solid var(--bg-button);
 }
 .Button:hover {
   background-color: var(--bg-buttonlight);
 }
 .Selected {
   background-color: var(--bg-buttonlight);
-  border: 2px solid var(--bg-button);
 }

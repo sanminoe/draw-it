@@ -14,3 +14,11 @@
 body {
   background-color: var(--bg);
 }
+.App {
+  display: flex;
+  flex-direction: column;
+}
+.linkGithub {
+  color: rgb(140, 20, 20);
+  margin-left: 2rem;
+}
