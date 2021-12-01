@@ -1,9 +1,9 @@
 import { SyntheticEvent, useEffect, useRef, useState } from "react";
 import drawOval from "../../../helpers/drawOval";
-import hexToRgb from "../../../helpers/hexToRgb";
 import { rgbToHex } from "../../../helpers/rgbToHex";
 import ButtonsSection from "../../Components/ButtonsSection/ButtonsSection";
 import style from "./RoomPage.module.css";
+// import socketIOClient from "socket.io-client";
 
 type Point = {
   x: number;
@@ -18,12 +18,21 @@ interface DrawingData {
   tool: string;
   points: Point[];
 }
+type History = DrawingData[];
+
 function RoomPage() {
+  // Canvas state
+  let [data, setData] = useState<DrawingData[]>([]);
+
+  // Tools settings
   let [tool, setTool] = useState("pen");
   let [toolSize, setToolSize] = useState(10);
-  let [data, setData] = useState<DrawingData[]>([]);
   const [toolColor, setToolColor] = useState("#000000");
   let [isFilled, setIsFilled] = useState(false);
+
+  // Drawing history
+  const [historyData, setHistoryData] = useState<History[]>([]);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
 
   let isDrawing = useRef<Boolean>(false);
 
@@ -113,7 +122,7 @@ function RoomPage() {
   ) => {
     const firstPoint = shape.points[0];
     const lastPoint = shape.points[shape.points.length - 1];
-
+    ctx.beginPath();
     drawOval(ctx!, firstPoint.x, firstPoint.y, lastPoint.x, lastPoint.y);
     if (!firstPoint.filled) {
       ctx.lineWidth = firstPoint.height as number;
@@ -123,6 +132,7 @@ function RoomPage() {
       ctx.fillStyle = firstPoint.color as string;
       ctx?.fill();
     }
+    ctx.closePath();
   };
 
   const lineToolRender = (
@@ -173,7 +183,6 @@ function RoomPage() {
         canvasRef.current?.getContext("2d") as CanvasRenderingContext2D,
         mousePos
       );
-      console.log(color);
       setTool("pen");
       setToolColor(color);
     } else {
@@ -211,17 +220,15 @@ function RoomPage() {
     }
 
     let lastLine = data[data.length - 1];
-    if (tool !== "picker") {
-      lastLine.points = lastLine.points.concat([
-        {
-          x: mousePos.x,
-          y: mousePos.y,
-          color: toolColor,
-          size: toolSize,
-          filled: isFilled,
-        },
-      ]);
-    }
+    lastLine.points = lastLine.points.concat([
+      {
+        x: mousePos.x,
+        y: mousePos.y,
+        color: toolColor,
+        size: toolSize,
+        filled: isFilled,
+      },
+    ]);
     if (tool === "pen") {
       penToolRender(ctx!, lastLine);
 
@@ -241,8 +248,32 @@ function RoomPage() {
       lineToolRender(ctx!, lastLine);
     }
     renderToolPreview(ctx!, mousePos);
-    if (tool !== "picker") {
-      setData(data.concat());
+    setData(data.concat());
+  };
+
+  const render = () => {
+    // let overCtx = overlayRef.current?.getContext("2d");
+    // overCtx?.clearRect(0, 0, overCtx.canvas.width, overCtx.canvas.height);
+
+    let ctx = canvasRef.current?.getContext("2d");
+    ctx?.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    for (let i = 0; i < data.length; i++) {
+      const shape = data[i];
+
+      if (shape.tool === "pen") {
+        penToolRender(ctx!, shape);
+        ctx?.stroke();
+      } else if (shape.tool === "eraser") {
+        penToolRender(ctx!, shape);
+        ctx?.stroke();
+      } else if (tool === "rectangle") {
+        rectToolRender(ctx!, shape);
+      } else if (tool === "ellipse") {
+        ellipseToolRender(ctx!, shape);
+      } else if (tool === "line") {
+        lineToolRender(ctx!, shape);
+      }
     }
   };
 
@@ -272,11 +303,19 @@ function RoomPage() {
     }
   };
 
+  const undoHandler = () => {
+    //
+  };
+
   useEffect(() => {
     let ctx = canvasRef.current?.getContext("2d");
     ctx!.globalCompositeOperation =
       tool === "eraser" ? "destination-out" : "source-over";
   }, [tool]);
+
+  useEffect(() => {
+    // let socket = socketIOClient("http://localhost:3001");
+  }, []);
   return (
     <div className={style.Wrapper}>
       <ButtonsSection
@@ -310,6 +349,10 @@ function RoomPage() {
               onClick={() => setIsFilled(!isFilled)}
             />
           </label>
+          <div>
+            <button onClick={undoHandler}>Undo</button>
+            <button>Redo</button>
+          </div>
         </div>
         <div className={style.Canvases}>
           <canvas
@@ -327,9 +370,6 @@ function RoomPage() {
             ref={canvasRef}
             width={700}
             height={500}
-            // onMouseMove={handlerOnMove}
-            // onMouseDown={handlerOnMouseDown}
-            // onMouseUp={handlerMouseUp}
           />
         </div>
       </div>
