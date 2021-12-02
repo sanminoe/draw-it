@@ -10,21 +10,24 @@
   color: white;
 }
 .canvas {
+  user-select: none;
   z-index: 100;
   background-color: white;
 }
 
 .ToolsOptions {
   margin-left: 5rem;
-  margin-bottom: 20px;
   display: flex;
+  justify-content: flex-start;
   align-items: center;
+  user-select: none;
 }
-.ToolsOptions div {
+
+.ToolFill {
   display: flex;
   height: 100%;
+  align-items: center;
   flex-direction: column;
-  justify-content: center;
   user-select: none;
 }
 .Canvases {
@@ -50,7 +53,6 @@
   background: transparent;
   margin-top: 1rem;
   margin-right: 1rem;
-  transform: rotate(-90deg);
 }
 
 .sizeInput::-webkit-slider-thumb {
@@ -69,12 +71,16 @@
   background: white;
 }
 .sizeWrapper {
-  height: 8rem;
+  height: 4rem;
   display: flex;
+  margin-left: 2rem;
 }
 .sizeWrapper div {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
-.sizeWrapper span {
-  background-color: turquoise;
+.sizeWrapper label {
+  text-align: center;
 }

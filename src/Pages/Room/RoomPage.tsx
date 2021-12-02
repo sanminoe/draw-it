@@ -1,30 +1,23 @@
 import { SyntheticEvent, useEffect, useRef, useState } from "react";
-import drawOval from "../../../helpers/drawOval";
-import { rgbToHex } from "../../../helpers/rgbToHex";
+import drawOval from "../../helpers/drawOval";
+import { rgbToHex } from "../../helpers/rgbToHex";
 import ButtonsSection from "../../Components/ButtonsSection/ButtonsSection";
 import style from "./RoomPage.module.css";
 // import socketIOClient from "socket.io-client";
-
+import type { Point, Shape } from "../../types/generic";
+// fix bug when one click with other tools
+import {
+  rectangleDraw,
+  lineDraw,
+  penDraw,
+  ellipseDraw,
+  eraserDraw,
+} from "../../helpers/shapeDraw";
 import { BsGithub } from "react-icons/bs";
-
-type Point = {
-  x: number;
-  y: number;
-  width?: number;
-  height?: number;
-  color?: string;
-  size?: number;
-  filled?: boolean;
-};
-interface DrawingData {
-  tool: string;
-  points: Point[];
-}
-type History = DrawingData[];
 
 function RoomPage() {
   // Canvas state
-  let [data, setData] = useState<DrawingData[]>([]);
+  let [data, setData] = useState<Shape[]>([]);
 
   // Tools settings
   let [tool, setTool] = useState("pen");
@@ -33,8 +26,6 @@ function RoomPage() {
   let [isFilled, setIsFilled] = useState(false);
 
   // Drawing history
-  const [historyData, setHistoryData] = useState<History[]>([]);
-  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
 
   let isDrawing = useRef<Boolean>(false);
 
@@ -66,92 +57,6 @@ function RoomPage() {
     ctx?.closePath();
   };
 
-  const penToolRender = (ctx: CanvasRenderingContext2D, obj: DrawingData) => {
-    // Render incoming pen data
-    let points = obj.points;
-    if (points.length < 6) {
-      let p = points[0];
-      ctx.beginPath();
-      ctx.fillStyle = p.color as string;
-      ctx.arc(p.x, p.y, Math.floor(ctx.lineWidth / 2), 0, Math.PI * 2, false);
-      ctx.fill();
-      ctx.closePath();
-      return;
-    }
-
-    ctx.beginPath();
-    ctx!.lineCap = "round";
-    ctx!.lineJoin = "round";
-    ctx!.lineWidth = points[0].size as number;
-    ctx.moveTo(points[0].x, points[0].y);
-
-    let i = 1;
-    for (i = 1; i < points.length - 2; i++) {
-      const c1 = (points[i].x + points[i + 1].x) / 2;
-      const c2 = (points[i].y + points[i + 1].y) / 2;
-
-      ctx!.strokeStyle = points[i].color as string;
-      ctx.quadraticCurveTo(points[i].x, points[i].y, c1, c2);
-    }
-  };
-
-  const rectToolRender = (
-    ctx: CanvasRenderingContext2D,
-    shape: DrawingData
-  ) => {
-    let firstPoint = shape.points[0];
-    let lastPoint = shape.points[shape.points.length - 1];
-    let width = lastPoint.x - firstPoint.x;
-    let height = lastPoint.y - firstPoint.y;
-    ctx!.lineJoin = "miter";
-    ctx?.beginPath();
-    if (firstPoint.filled) {
-      ctx!.fillStyle = firstPoint.color as string;
-      ctx?.fillRect(firstPoint.x, firstPoint.y, width, height);
-    } else {
-      ctx!.lineWidth = firstPoint.size as number;
-      ctx!.strokeStyle = firstPoint.color as string;
-      ctx?.rect(firstPoint.x, firstPoint.y, width, height);
-
-      ctx?.stroke();
-    }
-    ctx?.closePath();
-  };
-  const ellipseToolRender = (
-    ctx: CanvasRenderingContext2D,
-    shape: DrawingData
-  ) => {
-    const firstPoint = shape.points[0];
-    const lastPoint = shape.points[shape.points.length - 1];
-    ctx.beginPath();
-    drawOval(ctx!, firstPoint.x, firstPoint.y, lastPoint.x, lastPoint.y);
-    ctx.lineWidth = firstPoint.size as number;
-    if (!firstPoint.filled) {
-      ctx.strokeStyle = firstPoint.color as string;
-      ctx?.stroke();
-    } else {
-      // ctx.lineWidth = firstPoint.height as number;
-      ctx.fillStyle = firstPoint.color as string;
-      ctx?.fill();
-    }
-    ctx.closePath();
-  };
-
-  const lineToolRender = (
-    ctx: CanvasRenderingContext2D,
-    shape: DrawingData
-  ) => {
-    const firstPoint = shape.points[0],
-      lastPoint = shape.points[shape.points.length - 1];
-    ctx?.beginPath();
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = firstPoint.size as number;
-    ctx.strokeStyle = firstPoint.color as string;
-    ctx.moveTo(firstPoint.x, firstPoint.y);
-    ctx.lineTo(lastPoint.x, lastPoint.y);
-    ctx.stroke();
-  };
   interface MouseCords {
     x: number;
     y: number;
@@ -195,42 +100,46 @@ function RoomPage() {
       let color = colorPickerTool(orCtx as CanvasRenderingContext2D, mousePos);
       setTool("pen");
       setToolColor(color);
-    } else {
-      isDrawing.current = true;
-
-      let shape = {
-        tool,
-        points: [
-          {
-            x: mousePos.x,
-            y: mousePos.y,
-            color: toolColor,
-            size: toolSize,
-            filled: isFilled,
-          },
-        ],
-      };
-
-      if (shape.tool === "pen") {
-        penToolRender(ctx!, shape);
-
-        penToolRender(orCtx!, shape);
-      } else if (tool === "eraser") {
-        penToolRender(ctx!, shape);
-        ctx!.strokeStyle = "white";
-
-        penToolRender(orCtx!, shape);
-      } else if (tool === "rectangle") {
-        rectToolRender(ctx!, shape);
-      } else if (tool === "ellipse") {
-        ellipseToolRender(ctx!, shape);
-        ctx!.lineWidth = toolSize;
-      } else if (tool === "line") {
-        lineToolRender(ctx!, shape);
-      }
-
-      setData([...data, shape]);
+      return;
     }
+    isDrawing.current = true;
+
+    let shape = {
+      tool,
+      points: [
+        {
+          x: mousePos.x,
+          y: mousePos.y,
+          color: toolColor,
+          size: toolSize,
+          filled: isFilled,
+        },
+      ],
+    };
+    if (shape.tool === "pen") {
+      console.log("PEN");
+      penDraw(ctx!, shape);
+
+      penDraw(orCtx!, shape);
+    } else if (tool === "eraser") {
+      eraserDraw(ctx!, shape);
+
+      eraserDraw(orCtx!, shape);
+
+      ctx!.strokeStyle = "white";
+    } else if (tool === "rectangle") {
+      console.log("RECTANGLE");
+      // ctx!.lineCap = "square";
+      rectangleDraw(ctx!, shape);
+    } else if (tool === "ellipse") {
+      ellipseDraw(ctx!, shape);
+      ctx!.lineWidth = toolSize;
+    } else if (tool === "line") {
+      lineDraw(ctx!, shape);
+    } else {
+      return;
+    }
+    setData([...data, shape]);
   };
 
   const handlerOverlayMouseMove = (
@@ -245,6 +154,9 @@ function RoomPage() {
     if (!isDrawing.current && tool !== "picker") {
       return;
     }
+    if (tool === "picker") {
+      return;
+    }
 
     let lastShape = data[data.length - 1];
     lastShape.points = lastShape.points.concat([
@@ -257,23 +169,22 @@ function RoomPage() {
       },
     ]);
     if (tool === "pen") {
-      penToolRender(ctx!, lastShape);
-      penToolRender(orCtx!, lastShape);
+      penDraw(ctx!, lastShape);
+      penDraw(orCtx!, lastShape);
 
       ctx?.stroke();
     } else if (tool === "eraser") {
-      penToolRender(ctx!, lastShape);
-      ctx!.strokeStyle = "white";
+      eraserDraw(ctx!, lastShape);
       ctx?.stroke();
 
-      penToolRender(orCtx!, lastShape);
+      eraserDraw(orCtx!, lastShape);
     } else if (tool === "rectangle") {
-      rectToolRender(ctx!, lastShape);
+      rectangleDraw(ctx!, lastShape);
     } else if (tool === "ellipse") {
-      ellipseToolRender(ctx!, lastShape);
+      ellipseDraw(ctx!, lastShape);
       ctx!.lineWidth = toolSize;
     } else if (tool === "line") {
-      lineToolRender(ctx!, lastShape);
+      lineDraw(ctx!, lastShape);
     }
     renderToolPreview(ctx!, mousePos);
     setData(data.concat());
@@ -290,17 +201,17 @@ function RoomPage() {
       const shape = data[i];
 
       if (shape.tool === "pen") {
-        penToolRender(ctx!, shape);
+        penDraw(ctx!, shape);
         ctx?.stroke();
       } else if (shape.tool === "eraser") {
-        penToolRender(ctx!, shape);
+        eraserDraw(ctx!, shape);
         ctx?.stroke();
       } else if (tool === "rectangle") {
-        rectToolRender(ctx!, shape);
+        rectangleDraw(ctx!, shape);
       } else if (tool === "ellipse") {
-        ellipseToolRender(ctx!, shape);
+        ellipseDraw(ctx!, shape);
       } else if (tool === "line") {
-        lineToolRender(ctx!, shape);
+        lineDraw(ctx!, shape);
       }
     }
   };
@@ -319,20 +230,21 @@ function RoomPage() {
     renderToolPreview(overCtx!, getMousePosition(e));
 
     if (tool === "pen") {
-      penToolRender(ctx!, lastShape);
+      penDraw(ctx!, lastShape);
       if (lastShape.points.length > 5) {
         ctx?.stroke();
       }
     } else if (tool === "eraser") {
+      eraserDraw(ctx!, lastShape);
       if (lastShape.points.length > 5) {
         ctx?.stroke();
       }
     } else if (tool === "rectangle") {
-      rectToolRender(ctx!, lastShape);
+      rectangleDraw(ctx!, lastShape);
     } else if (tool === "ellipse") {
-      ellipseToolRender(ctx!, lastShape);
+      ellipseDraw(ctx!, lastShape);
     } else if (tool === "line") {
-      lineToolRender(ctx!, lastShape);
+      lineDraw(ctx!, lastShape);
     } else {
       return;
     }
@@ -369,11 +281,11 @@ function RoomPage() {
     } else if (tool === "eraser") {
       ctx?.stroke();
     } else if (tool === "rectangle") {
-      rectToolRender(ctx!, lastShape);
+      rectangleDraw(ctx!, lastShape);
     } else if (tool === "ellipse") {
-      ellipseToolRender(ctx!, lastShape);
+      ellipseDraw(ctx!, lastShape);
     } else if (tool === "line") {
-      lineToolRender(ctx!, lastShape);
+      lineDraw(ctx!, lastShape);
     }
     setData(data.concat());
   };
@@ -388,14 +300,11 @@ function RoomPage() {
       tool === "eraser" ? "destination-out" : "source-over";
   }, [tool]);
 
-  useEffect(() => {
-    // let socket = socketIOClient("http://localhost:3001");
-  }, []);
   return (
     <div className={style.Wrapper}>
       <div>
         <div className={style.ToolsOptions}>
-          <div>
+          <div className={style.ToolFill}>
             <span>Fill</span>
             <input
               type="checkbox"
@@ -404,6 +313,20 @@ function RoomPage() {
               value={String(isFilled)}
               onClick={() => setIsFilled(!isFilled)}
             />
+          </div>
+          <div className={style.sizeWrapper}>
+            <div>
+              <label htmlFor="toolSize">Size</label>
+              <input
+                className={style.sizeInput}
+                type="range"
+                min="1"
+                max="100"
+                name="toolSize"
+                value={toolSize}
+                onChange={(e) => setToolSize(+e.currentTarget.value)}
+              />
+            </div>
           </div>
 
           {/* <div>
@@ -438,25 +361,13 @@ function RoomPage() {
               height={500}
             />
           </div>
-          <div className={style.sizeWrapper}>
-            <div>
-              <input
-                className={style.sizeInput}
-                type="range"
-                min="1"
-                max="100"
-                value={toolSize}
-                onChange={(e) => setToolSize(+e.currentTarget.value)}
-              />
-              {/* <p>Size</p> */}
-            </div>
-          </div>
         </div>
       </div>
       <div className="linkGithub">
         <a
           href="https://github.com/sanminoe/draw-it"
           style={{ color: "white" }}
+          target="_blank"
         >
           By Sanminoe {<BsGithub />}
         </a>
