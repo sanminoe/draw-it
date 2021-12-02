@@ -2,8 +2,6 @@
 
 My goal with this project was learning more about the Canvas API, Typescript and in the future WebSockets.
 
----
-
 ## Project Features
 
 - [x] User can draw in a canvas using the mouse.
@@ -11,8 +9,6 @@ My goal with this project was learning more about the Canvas API, Typescript and
 - [x] User can change the size of the tool.
 - [x] User can press a button to clear the canvas.
 - [x] User can use various shapes to draw (Rectangle, Line, Ellipse)
-
----
 
 ## Technology used
 
