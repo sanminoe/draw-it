@@ -7,8 +7,9 @@ const penDraw = (ctx: CanvasRenderingContext2D, obj: Shape) => {
   if (points.length < 6) {
     let p = points[0];
     ctx.beginPath();
+
     ctx.fillStyle = p.color as string;
-    ctx.arc(p.x, p.y, Math.floor(ctx.lineWidth / 2), 0, Math.PI * 2, false);
+    ctx.arc(p.x, p.y, Math.floor(p.size! / 2), 0, Math.PI * 2, false);
     ctx.fill();
     ctx.closePath();
     return;

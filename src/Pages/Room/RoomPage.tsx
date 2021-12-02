@@ -118,8 +118,8 @@ function RoomPage() {
     };
     if (shape.tool === "pen") {
       console.log("PEN");
+      console.log(shape.points[0]);
       penDraw(ctx!, shape);
-
       penDraw(orCtx!, shape);
     } else if (tool === "eraser") {
       eraserDraw(ctx!, shape);
